@@ -41,17 +41,19 @@ export function FactCheckReport() {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-3">
             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white text-sm font-medium rounded-full">
               <AlertCircleIcon className="w-4 h-4" />
-              Mixed
+              Analysis Complete
             </span>
             <p className="text-sm text-gray-600">
-              Analysis based on {newsData.sentiment_analysis.sentiment_summary.total_analyzed} sources
+              Based on {newsData.sentiment_analysis.sentiment_summary.total_analyzed} sources
             </p>
           </div>
-          <div className="text-sm text-gray-700 whitespace-pre-line">
-            {factCheck}
+          <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed prose prose-sm max-w-none">
+            {factCheck.split('\n').map((paragraph, index) => (
+              paragraph.trim() ? <p key={index} className="mb-2">{paragraph}</p> : null
+            ))}
           </div>
         </div>
       )}

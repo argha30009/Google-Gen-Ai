@@ -62,8 +62,10 @@ export function ForensicAnalysis() {
             </div>
           </div>)}
       </div>
-      <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-line max-h-48 overflow-y-auto">
-        {forensicAnalysis}
+      <div className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none max-h-64 overflow-y-auto">
+        {forensicAnalysis.split('\n').map((paragraph, index) => (
+          paragraph.trim() ? <p key={index} className="mb-2 text-xs">{paragraph}</p> : null
+        ))}
       </div>
     </div>;
 }
