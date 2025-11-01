@@ -232,6 +232,63 @@ class ManagerAgent:
                 "status": "failed"
             }
     
+    def _is_news_related_query(self, query: str) -> bool:
+        """
+        Check if the query is related to news/current events or not.
+        Returns False for math equations, recipes, code, how-to queries, etc.
+        
+        Args:
+            query: The user's query
+            
+        Returns:
+            bool: True if query appears to be news-related, False otherwise
+        """
+        query_lower = query.lower().strip()
+        
+        # Check for mathematical expressions
+        math_patterns = ['+', '-', '×', '÷', '=', 'solve', 'equation', 'calculate', 
+                        'sum', 'multiply', 'divide', 'subtract', 'add', 'square root',
+                        'derivative', 'integral', 'x^', 'x²', 'x³']
+        if any(pattern in query_lower for pattern in math_patterns):
+            # Check if it's actually math (has numbers with operators)
+            if any(char.isdigit() for char in query):
+                return False
+        
+        # Check for recipe/cooking queries
+        recipe_patterns = ['recipe for', 'how to cook', 'how to make', 'how to bake',
+                          'cooking instructions', 'ingredients for', 'cook ', 'bake ',
+                          'recipe of', 'how do i cook', 'how do i make']
+        if any(pattern in query_lower for pattern in recipe_patterns):
+            return False
+        
+        # Check for code/programming queries
+        code_patterns = ['write code', 'python code', 'javascript code', 'function to',
+                        'code for', 'programming', 'how to code', 'script for',
+                        'algorithm for', 'implement', 'def ', 'function(', 'class ']
+        if any(pattern in query_lower for pattern in code_patterns):
+            return False
+        
+        # Check for general how-to/tutorial queries (not news-related)
+        howto_patterns = ['how to fix', 'how to install', 'how to use', 'tutorial',
+                         'step by step', 'guide to', 'instructions for']
+        if any(pattern in query_lower for pattern in howto_patterns):
+            return False
+        
+        # Check for personal questions
+        personal_patterns = ['what is my', 'where am i', 'who am i', 'tell me a joke',
+                           'fun fact', 'riddle']
+        if any(pattern in query_lower for pattern in personal_patterns):
+            return False
+        
+        # Very short queries without news context (likely not news)
+        if len(query_lower.split()) < 2 and not any(word in query_lower for word in 
+                                                     ['news', 'update', 'latest', 'today']):
+            # Single word queries without news keywords are likely not news-related
+            # unless they're proper nouns or topics
+            return len(query_lower) > 3  # Allow longer single words (e.g., "Brexit")
+        
+        return True
+    
     def run_with_trends(self, query: str) -> Dict[str, Any]:
         """
         Execute the full pipeline with Google Trends analysis.
@@ -243,6 +300,40 @@ class ManagerAgent:
             Dict containing search results, sentiment analysis, trends analysis, and reports
         """
         try:
+            # Validate if query is news-related
+            if not self._is_news_related_query(query):
+                logger.info(f"Non-news query detected: {query}")
+                return {
+                    "query": query,
+                    "search_results": {
+                        "headlines": [],
+                        "message": "Could not find any data for the topic"
+                    },
+                    "sentiment_analysis": {
+                        "sentiment_summary": {
+                            "overall": "neutral",
+                            "positive_count": 0,
+                            "negative_count": 0,
+                            "neutral_count": 0,
+                            "total_analyzed": 0
+                        },
+                        "per_item": [],
+                        "message": "Could not find any data for the topic"
+                    },
+                    "trends_analysis": {
+                        "message": "Could not find any data for the topic"
+                    },
+                    "summary": {
+                        "overview": f"No news data available for '{query}'",
+                        "sentiment_overview": "neutral",
+                        "sentiment_summary": f"Could not find any data for the topic '{query}'. This query does not appear to be related to news or current events.",
+                        "fact_check": f"Could not find any data for the topic '{query}'.",
+                        "bias_check": f"Could not find any data for the topic '{query}'.",
+                        "forensic_analysis": f"Could not find any data for the topic '{query}'."
+                    },
+                    "status": "no_data"
+                }
+            
             # Run the standard pipeline
             report = self.run(query)
             
