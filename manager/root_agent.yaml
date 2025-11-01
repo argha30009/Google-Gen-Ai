@@ -1,0 +1,9 @@
+agent:
+  id: manager-agent
+  name: Manager Agent
+  description: Minimal ADK wrapper for the manager package
+
+runtime:
+  type: python
+  path: manager/agent.py
+  entrypoint: manager.agent:main

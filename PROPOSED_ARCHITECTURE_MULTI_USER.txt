@@ -1,0 +1,332 @@
+═══════════════════════════════════════════════════════════════════════════════
+              PROPOSED ARCHITECTURE: MULTI-USER WITH CACHING
+                    News Search & Sentiment Analysis System
+                         Enhanced for Scale & Performance
+═══════════════════════════════════════════════════════════════════════════════
+
+
+SYSTEM OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Current Limitations:
+  • Single user design
+  • No caching - every query hits external APIs
+  • High latency (6-8 seconds per request)
+  • High cost ($0.02 per request)
+  • Cannot scale to multiple concurrent users
+
+Proposed Enhancements:
+  ✅ Multi-user support with authentication
+  ✅ Redis caching layer for instant responses
+  ✅ PostgreSQL database for persistent storage
+  ✅ Query result caching with TTL
+  ✅ 70%+ cache hit rate target
+  ✅ Sub-20ms response time for cached queries
+  ✅ 400x performance improvement
+  ✅ 70% cost reduction
+
+
+ARCHITECTURE DIAGRAM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     👥 MULTIPLE USERS (Web Browsers)                        │
+│                     User A, User B, User C, User D...                       │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │ HTTPS
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      🔐 API GATEWAY / LOAD BALANCER                         │
+│  • Authentication (JWT)  • Rate Limiting  • SSL/TLS  • Load Distribution    │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    ▼              ▼              ▼
+        ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+        │  Manager UI   │  │  Manager UI   │  │  Manager UI   │
+        │  Instance 1   │  │  Instance 2   │  │  Instance 3   │
+        └───────┬───────┘  └───────┬───────┘  └───────┬───────┘
+                └──────────────────┼──────────────────┘
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      💾 REDIS CACHE CLUSTER                                 │
+│  Key: "query:{hash}:{date}"  |  TTL: 1 hour  |  LRU Eviction               │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐           │
+│  │  Redis Master   │  │  Redis Replica  │  │  Redis Replica  │           │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘           │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │ Cache Miss?
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      🎯 MANAGER AGENT (Orchestrator)                        │
+│  1. Check Redis cache  2. Cache hit? Return  3. Cache miss? Search         │
+│  4. Call services  5. Generate report  6. Store in cache & DB              │
+└──────────────────┬──────────────────────────────────┬───────────────────────┘
+                   ▼                                  ▼
+┌──────────────────────────────────┐  ┌──────────────────────────────────────┐
+│  🔍 SEARCH SERVICE (x3)          │  │  😊 SENTIMENT SERVICE (x3)           │
+│  Port 8001 - Load Balanced       │  │  Port 8002 - Load Balanced           │
+└──────────────┬───────────────────┘  └──────────────┬───────────────────────┘
+               ▼                                     ▼
+┌──────────────────────────────────┐  ┌──────────────────────────────────────┐
+│  Google Search API               │  │  Gemini AI API                       │
+└──────────────────────────────────┘  └──────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      🗄️ POSTGRESQL DATABASE                                │
+│  Tables: users, queries, search_results, sentiment_results, reports        │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐           │
+│  │  PG Master      │  │  PG Replica 1   │  │  PG Replica 2   │           │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+DATA FLOW: CACHE HIT (Fast Path)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User A searches "Tesla" → Manager checks Redis → CACHE HIT! → Return result
+
+Response Time: 10-20ms
+API Calls: 0
+Cost: $0
+User Experience: Instant ⚡
+
+
+DATA FLOW: CACHE MISS (Full Pipeline)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User B searches "OpenAI" → Manager checks Redis → CACHE MISS → Full pipeline:
+  1. Call Search Service (2-3s)
+  2. Call Sentiment Service (3-5s)
+  3. Generate report (100ms)
+  4. Store in Redis + PostgreSQL (50ms)
+  5. Return result
+
+Response Time: 6-8 seconds
+API Calls: 2 (Search + Gemini)
+Cost: $0.02
+Result cached for next users ✅
+
+
+DATA FLOW: SUBSEQUENT USERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Users C, D, E search "OpenAI" (within 1 hour) → All get CACHE HIT
+
+Response Time: 10-20ms each
+Cost: $0 per request
+Performance: 400x faster than cache miss
+
+
+DATABASE SCHEMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Table: users
+  • id (UUID, PK)
+  • email (VARCHAR, Unique)
+  • api_key (VARCHAR, Indexed)
+  • rate_limit_tier (VARCHAR)
+  • created_at, last_login (TIMESTAMP)
+
+Table: queries
+  • id (UUID, PK)
+  • user_id (UUID, FK → users.id)
+  • query_text (TEXT)
+  • query_hash (VARCHAR, Indexed)
+  • created_at (TIMESTAMP, Indexed)
+  • execution_time_ms (INTEGER)
+
+Table: search_results
+  • id (UUID, PK)
+  • query_id (UUID, FK → queries.id)
+  • query_hash (VARCHAR, Indexed)
+  • query_date (DATE, Indexed)
+  • headlines (JSONB)
+  • meta (JSONB)
+  • created_at, expires_at (TIMESTAMP)
+
+Table: sentiment_results
+  • id (UUID, PK)
+  • search_result_id (UUID, FK → search_results.id)
+  • sentiment_summary (JSONB)
+  • per_item_analysis (JSONB)
+  • created_at, expires_at (TIMESTAMP)
+
+Table: reports
+  • id (UUID, PK)
+  • sentiment_result_id (UUID, FK → sentiment_results.id)
+  • fact_check, bias_check, forensic_analysis (TEXT)
+  • created_at, expires_at (TIMESTAMP)
+
+Table: query_cache_stats
+  • query_hash (VARCHAR, Indexed)
+  • hit_count, miss_count (INTEGER)
+  • last_accessed (TIMESTAMP)
+  • avg_response_time_ms (INTEGER)
+
+
+CACHE STRATEGY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Cache Key Format:
+  "query:{hash(query)}:{date}"
+  Example: "query:a3f5b9c2:2025-10-31"
+
+TTL (Time To Live):
+  • News queries: 1 hour
+  • Popular queries (hit_count > 100): 30 minutes
+  • Historical queries (date < today): 24 hours
+
+Cache Invalidation:
+  • Automatic expiration via TTL
+  • Date-based (new day = new cache key)
+  • Manual via admin API
+  • Proactive refresh for popular queries
+
+Benefits:
+  • Same query within 1 hour = instant response
+  • Different users benefit from each other's searches
+  • Reduces API costs by 70%+
+  • Improves response time by 400x
+
+
+AUTHENTICATION & RATE LIMITING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Authentication:
+  • JWT tokens (24h expiration)
+  • API keys for programmatic access
+  • OAuth2 support (Google, GitHub)
+
+Rate Limiting Tiers:
+  Free: 10 req/hour, 100 req/day
+  Pro: 100 req/hour, 1,000 req/day
+  Enterprise: Unlimited
+
+Note: Cache hits don't count toward rate limits!
+
+
+PERFORMANCE COMPARISON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Current System (No Cache):
+  • Response time: 6-8 seconds
+  • Throughput: ~450 requests/hour per instance
+  • Cost: $0.02 per request
+  • 1,000 users/hour = $20/hour = $480/day
+
+Proposed System (70% cache hit rate):
+  • Cache hit response: 15ms (400x faster)
+  • Cache miss response: 6-8 seconds
+  • Throughput: ~240,000 requests/hour per instance
+  • Cost: 70% cache hits ($0) + 30% misses ($0.02) = $0.006 avg
+  • 1,000 users/hour = $6/hour = $144/day
+  • Savings: 70% cost reduction, 533x throughput increase
+
+
+SCALABILITY METRICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+With 3 Manager instances + Redis cluster:
+  • Can handle 720,000 requests/hour
+  • Support 10,000+ concurrent users
+  • 99.9% uptime with redundancy
+  • Auto-scaling based on load
+
+
+MONITORING & ALERTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Key Metrics:
+  • Cache hit rate (target: > 70%)
+  • Average response time (p50, p95, p99)
+  • API call costs
+  • Active users
+  • Error rates
+  • Database query performance
+
+Monitoring Stack:
+  Grafana → Prometheus → Services
+  Kibana → Elasticsearch → Logstash → Logs
+
+
+IMPLEMENTATION PHASES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Phase 1: Database Setup
+  • Set up PostgreSQL with schema
+  • Create indexes
+  • Set up replication
+
+Phase 2: Redis Integration
+  • Deploy Redis cluster
+  • Implement caching logic in Manager
+  • Add cache key generation
+
+Phase 3: Authentication
+  • Implement JWT authentication
+  • Add user registration/login
+  • Set up rate limiting
+
+Phase 4: Monitoring
+  • Deploy Prometheus + Grafana
+  • Add metrics endpoints
+  • Set up alerts
+
+Phase 5: Load Balancing
+  • Deploy multiple instances
+  • Set up load balancer
+  • Configure auto-scaling
+
+
+COST ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Infrastructure Costs (Monthly):
+  • Redis Cluster: $50
+  • PostgreSQL: $100
+  • Load Balancer: $30
+  • 3x Manager Instances: $150
+  • 3x Search Instances: $150
+  • 3x Sentiment Instances: $150
+  • Monitoring: $50
+  Total: $680/month
+
+API Costs (10,000 requests/day, 70% cache hit):
+  • 3,000 cache misses/day
+  • $0.02 per miss
+  • $60/day = $1,800/month
+
+Total Monthly Cost: $2,480
+
+Revenue Potential:
+  • 1,000 Pro users @ $10/month = $10,000/month
+  • Profit: $7,520/month
+
+
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Key Benefits:
+  ✅ 400x faster response for cached queries
+  ✅ 70% cost reduction
+  ✅ Support for thousands of concurrent users
+  ✅ Scalable architecture
+  ✅ High availability with redundancy
+  ✅ Better user experience
+  ✅ Revenue potential through tiered pricing
+
+Next Steps:
+  1. Review and approve architecture
+  2. Set up development environment
+  3. Implement Phase 1 (Database)
+  4. Test with sample data
+  5. Deploy to staging
+  6. Load testing
+  7. Production deployment
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF PROPOSAL
+═══════════════════════════════════════════════════════════════════════════════

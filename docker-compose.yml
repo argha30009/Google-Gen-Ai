@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  search-agent:
+    build:
+      context: ./manager/sub_agents/search_agent
+      dockerfile: Dockerfile
+    container_name: search-agent-service
+    ports:
+      - "8001:8001"
+    networks:
+      - agent-network
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  sentiment-agent:
+    build:
+      context: ./manager/sub_agents/sentiment_agent
+      dockerfile: Dockerfile
+    container_name: sentiment-agent-service
+    ports:
+      - "8002:8002"
+    networks:
+      - agent-network
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  manager-agent:
+    build:
+      context: ./manager
+      dockerfile: Dockerfile
+    container_name: manager-agent
+    networks:
+      - agent-network
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SEARCH_SERVICE_URL=http://search-agent:8001
+      - SENTIMENT_SERVICE_URL=http://sentiment-agent:8002
+    depends_on:
+      search-agent:
+        condition: service_healthy
+      sentiment-agent:
+        condition: service_healthy
+    restart: unless-stopped
+    # Optional: Keep container running for interactive use
+    stdin_open: true
+    tty: true
+
+networks:
+  agent-network:
+    driver: bridge
+    name: google-adk-network

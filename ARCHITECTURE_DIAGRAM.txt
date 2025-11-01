@@ -1,0 +1,269 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    NEWS SEARCH & SENTIMENT ANALYSIS SYSTEM
+                          Microservices Architecture
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                           👤 USER (Web Browser)                             │
+│                                                                             │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │ HTTP GET /
+                                   │ (Loads Web UI)
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│                      🌐 MANAGER WEB UI (Port 8000)                          │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  FastAPI Server                                                       │ │
+│  │  ├─ GET /          → HTML/CSS/JS Web Interface                        │ │
+│  │  ├─ POST /run      → Process news query                               │ │
+│  │  └─ GET /health    → Health check                                     │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Manager Agent (Python Class)                                         │ │
+│  │  ├─ HTTP Client (httpx)                                               │ │
+│  │  ├─ Retry Logic (tenacity) - 3 attempts, exponential backoff          │ │
+│  │  ├─ Error Handling                                                    │ │
+│  │  ├─ Report Generation                                                 │ │
+│  │  │  ├─ Sentiment Summary                                              │ │
+│  │  │  ├─ Fact Check Report                                              │ │
+│  │  │  ├─ Bias Check Report                                              │ │
+│  │  │  └─ Forensic Analysis                                              │ │
+│  │  └─ Health Checks                                                     │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+└──────────────────┬──────────────────────────────────┬───────────────────────┘
+                   │                                  │
+                   │ HTTP POST                        │ HTTP POST
+                   │ /run                             │ /run
+                   │ {"query": "..."}                 │ {"headlines": [...]}
+                   │ Timeout: 60s                     │ Timeout: 60s
+                   │                                  │
+                   ▼                                  ▼
+┌──────────────────────────────────┐  ┌──────────────────────────────────────┐
+│                                  │  │                                      │
+│  🔍 SEARCH SERVICE (Port 8001)   │  │  😊 SENTIMENT SERVICE (Port 8002)    │
+│                                  │  │                                      │
+│  ┌────────────────────────────┐  │  │  ┌────────────────────────────────┐ │
+│  │  FastAPI Server            │  │  │  │  FastAPI Server                │ │
+│  │  ├─ POST /run              │  │  │  │  ├─ POST /run                  │ │
+│  │  └─ GET /health            │  │  │  │  └─ GET /health                │ │
+│  └────────────────────────────┘  │  │  └────────────────────────────────┘ │
+│                                  │  │                                      │
+│  ┌────────────────────────────┐  │  │  ┌────────────────────────────────┐ │
+│  │  Google ADK Components     │  │  │  │  Google ADK Components         │ │
+│  │  ├─ Runner                 │  │  │  │  ├─ Runner                     │ │
+│  │  ├─ InMemorySessionService │  │  │  │  ├─ InMemorySessionService     │ │
+│  │  ├─ search_agent (Agent)   │  │  │  │  ├─ sentiment_agent (Agent)    │ │
+│  │  │  ├─ Model: gemini-2.5   │  │  │  │  │  ├─ Model: gemini-2.5       │ │
+│  │  │  └─ Tools: google_search│  │  │  │  │  └─ Analyzes sentiment      │ │
+│  │  └─ Session Management     │  │  │  │  └─ Session Management         │ │
+│  └────────────────────────────┘  │  │  └────────────────────────────────┘ │
+│                                  │  │                                      │
+│  Process Flow:                   │  │  Process Flow:                       │
+│  1. Create session (UUID)        │  │  1. Create session (UUID)            │
+│  2. Format query as Content      │  │  2. Format headlines as Content      │
+│  3. Run agent async              │  │  3. Run agent async                  │
+│  4. Extract from events          │  │  4. Extract sentiment from events    │
+│  5. Parse headlines              │  │  5. Classify each headline           │
+│  6. Return structured data       │  │  6. Return structured data           │
+│                                  │  │                                      │
+└──────────────┬───────────────────┘  └──────────────┬───────────────────────┘
+               │                                     │
+               │ API Call                            │ API Call
+               │                                     │
+               ▼                                     ▼
+┌──────────────────────────────────┐  ┌──────────────────────────────────────┐
+│                                  │  │                                      │
+│  🔧 GOOGLE SEARCH TOOL           │  │  🤖 GEMINI AI API                    │
+│                                  │  │                                      │
+│  • Searches web for news         │  │  • Analyzes text sentiment           │
+│  • Returns headlines             │  │  • Provides detailed analysis        │
+│  • Includes metadata             │  │  • Classifies positive/negative      │
+│  • Source tracking               │  │  • Generates explanations            │
+│                                  │  │                                      │
+└──────────────────────────────────┘  └──────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              DATA FLOW SEQUENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+1️⃣  USER INTERACTION
+    └─► User opens http://localhost:8000
+    └─► Sees beautiful web interface
+    └─► Enters query: "Tesla"
+    └─► Clicks "Search News"
+
+2️⃣  MANAGER RECEIVES REQUEST
+    └─► POST /run {"query": "Tesla"}
+    └─► Validates request
+    └─► Initiates pipeline
+
+3️⃣  SEARCH PHASE
+    └─► Manager → Search Service (8001)
+    └─► POST /run {"query": "Tesla"}
+    └─► Search Service:
+        ├─ Creates ADK session
+        ├─ Runs search_agent with google_search tool
+        ├─ Extracts 10+ headlines from Google
+        ├─ Formats response
+        └─ Returns: {"headlines": [...], "meta": {...}}
+
+4️⃣  SENTIMENT PHASE
+    └─► Manager extracts headline texts
+    └─► Manager → Sentiment Service (8002)
+    └─► POST /run {"headlines": ["...", "..."]}
+    └─► Sentiment Service:
+        ├─ Creates ADK session
+        ├─ Runs sentiment_agent with Gemini AI
+        ├─ Analyzes each headline
+        ├─ Classifies sentiment (positive/negative/neutral)
+        └─ Returns: {"sentiment_summary": {...}, "per_item": [...]}
+
+5️⃣  REPORT GENERATION
+    └─► Manager combines results
+    └─► Generates comprehensive report:
+        ├─ Sentiment Summary (with counts)
+        ├─ Fact Check Report
+        ├─ Bias Check Report
+        └─ Forensic Analysis Report
+
+6️⃣  RESPONSE TO USER
+    └─► Manager returns complete JSON
+    └─► Browser JavaScript receives data
+    └─► Displays formatted sections:
+        ├─ 📊 Sentiment Analysis (stats + per-headline)
+        ├─ 📰 Headlines (numbered list)
+        ├─ ✅ Fact Check Report
+        ├─ 🔍 Bias Check Report
+        ├─ 🕵️ Forensic Analysis
+        └─ 📋 Full JSON Response
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                            TECHNOLOGY STACK
+═══════════════════════════════════════════════════════════════════════════════
+
+Backend Framework:
+  • FastAPI (Python 3.9+)
+  • Uvicorn (ASGI server)
+  • Pydantic (data validation)
+
+AI/ML:
+  • Google ADK (Agent Development Kit)
+  • Google Gemini 2.5 Flash (LLM)
+  • Google Search API
+
+HTTP Client:
+  • httpx (async HTTP)
+  • tenacity (retry logic)
+
+Frontend:
+  • Vanilla JavaScript
+  • HTML5 + CSS3
+  • Responsive design
+
+Data Format:
+  • JSON (API communication)
+  • Pydantic models (validation)
+
+Logging:
+  • Python logging module
+  • INFO level for operations
+  • ERROR level for failures
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         KEY FEATURES & CAPABILITIES
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Real-time News Search
+   └─ Fetches latest headlines from Google Search
+   └─ Supports any topic or keyword
+   └─ Returns 10+ relevant results
+
+✅ AI-Powered Sentiment Analysis
+   └─ Uses Gemini AI for accurate classification
+   └─ Analyzes positive, negative, neutral tones
+   └─ Provides detailed explanations
+
+✅ Comprehensive Reporting
+   └─ Sentiment summary with statistics
+   └─ Fact-checking analysis
+   └─ Bias detection and reporting
+   └─ Forensic source tracking
+
+✅ Resilient Architecture
+   └─ Automatic retries (3 attempts)
+   └─ Exponential backoff
+   └─ Health checks
+   └─ Error handling
+
+✅ Beautiful Web Interface
+   └─ Modern, responsive design
+   └─ Real-time loading indicators
+   └─ Formatted result sections
+   └─ JSON viewer for developers
+
+✅ Microservices Design
+   └─ Independent scaling
+   └─ Service isolation
+   └─ Clear API contracts
+   └─ Easy maintenance
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                            PORT ALLOCATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Port 8000: Manager Web UI + API
+Port 8001: Search Agent Service
+Port 8002: Sentiment Agent Service
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         ENVIRONMENT VARIABLES
+═══════════════════════════════════════════════════════════════════════════════
+
+Required:
+  GOOGLE_API_KEY=AIzaSyCTy7qN45nojQFv-2QehIIcmTvquGnncJU
+
+Optional:
+  SEARCH_SERVICE_URL=http://localhost:8001
+  SENTIMENT_SERVICE_URL=http://localhost:8002
+  REQUEST_TIMEOUT=60.0
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         DEPLOYMENT COMMANDS
+═══════════════════════════════════════════════════════════════════════════════
+
+Start All Services:
+
+# Terminal 1 - Search Agent
+export GOOGLE_API_KEY="AIzaSyCTy7qN45nojQFv-2QehIIcmTvquGnncJU"
+cd manager/sub_agents/search_agent
+uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+
+# Terminal 2 - Sentiment Agent
+export GOOGLE_API_KEY="AIzaSyCTy7qN45nojQFv-2QehIIcmTvquGnncJU"
+cd manager/sub_agents/sentiment_agent
+uvicorn server:app --host 0.0.0.0 --port 8002 --reload
+
+# Terminal 3 - Manager Web UI
+export GOOGLE_API_KEY="AIzaSyCTy7qN45nojQFv-2QehIIcmTvquGnncJU"
+cd manager
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+
+Access: http://localhost:8000
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF DIAGRAM
+═══════════════════════════════════════════════════════════════════════════════
