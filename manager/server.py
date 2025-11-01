@@ -3,6 +3,7 @@ FastAPI web server for the Manager Agent with interactive UI.
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any
 import logging
@@ -16,6 +17,15 @@ app = FastAPI(
     title="News Search & Sentiment Manager",
     description="Orchestrates news search and sentiment analysis",
     version="1.0.0"
+)
+
+# Add CORS middleware to allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8000"],  # Vite default port
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
