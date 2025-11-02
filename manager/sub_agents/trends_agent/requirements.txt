@@ -1,7 +1,9 @@
 fastapi
 uvicorn
 pydantic
+google-adk==1.17.0
 google-generativeai
 pytrends
 matplotlib
 pandas
+httpx

@@ -6,9 +6,24 @@ import { SentimentAnalysis } from '../components/SentimentAnalysis';
 import { ForensicAnalysis } from '../components/ForensicAnalysis';
 import { BiasCheckReport } from '../components/BiasCheckReport';
 import { UpcomingFeatures } from '../components/UpcomingFeatures';
+import { useNews } from '../context/NewsContext';
 export function Dashboard() {
+  const { error, newsData } = useNews();
+
+  console.log('📊 Dashboard render - error:', error, 'hasData:', !!newsData);
+
   return <div className="max-w-6xl mx-auto p-8">
       <DashboardHeader />
+      {error && (
+        <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-800">
+            <strong>Error:</strong> {error}
+          </p>
+          <p className="text-xs text-red-600 mt-1">
+            Please check that the backend services are running on localhost:8000
+          </p>
+        </div>
+      )}
       <div className="space-y-5">
         <FactCheckReport />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

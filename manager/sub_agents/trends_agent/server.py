@@ -4,14 +4,16 @@ FastAPI server for Google Trends Agent.
 import os
 import logging
 import base64
+import json
+import uuid
 from io import BytesIO
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import google.genai as genai
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
+from google.genai import types
 from pytrends.request import TrendReq
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
@@ -184,7 +186,7 @@ async def health_check():
 @app.post("/run", response_model=TrendsResponse)
 async def analyze_trends(request: TrendsRequest) -> TrendsResponse:
     """
-    Fetch Google Trends data and generate plot for a keyword.
+    Fetch Google Trends data using ADK Runner.
     
     Args:
         request: TrendsRequest with keyword
@@ -195,51 +197,98 @@ async def analyze_trends(request: TrendsRequest) -> TrendsResponse:
     try:
         logger.info(f"Fetching Google Trends data for keyword: {request.keyword}")
         
-        # Fetch Google Trends data and generate plot
+        # Fetch plot data (keep existing visualization)
         plot_data = fetch_trends_data(request.keyword)
         
-        # Check if data was fetched successfully
-        if plot_data.get("error"):
-            logger.warning(f"Error fetching trends data: {plot_data['error']}")
-            trend_analysis = {
-                "keyword": request.keyword,
-                "analysis": f"Unable to fetch trends data: {plot_data['error']}",
-                "status": "failed",
-                "trend_direction": "unknown"
-            }
-        else:
-            # Build analysis from statistics
-            stats = plot_data.get("statistics", {})
-            trend_direction = stats.get("trend_direction", "stable")
-            current = stats.get("current", 0)
-            peak = stats.get("max", 0)
-            avg = stats.get("average", 0)
+        # Use ADK Runner for analysis
+        try:
+            # Create session
+            user_id = "default_user"
+            session_id = str(uuid.uuid4())
+            await runner.session_service.create_session(
+                app_name="trends_agent_app",
+                user_id=user_id,
+                session_id=session_id
+            )
             
-            analysis_text = f"""Google Trends Analysis for '{request.keyword}':
-
-Current Search Interest: {current}/100
-Peak Interest: {peak}/100
-Average Interest: {avg}/100
-Trend Direction: {trend_direction.upper()}
-
-The search interest for '{request.keyword}' is currently {trend_direction}. """
+            # Create message with proper Content object
+            message_content = types.Content(
+                role="user",
+                parts=[types.Part(text=f"Analyze Google Trends for keyword: {request.keyword}")]
+            )
             
-            if trend_direction == "rising":
-                analysis_text += "This indicates growing public interest in this topic."
-            elif trend_direction == "falling":
-                analysis_text += "This indicates declining public interest in this topic."
+            # Call ADK Runner
+            result_generator = runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=message_content
+            )
+            
+            # Collect results from async generator
+            result = None
+            async for chunk in result_generator:
+                result = chunk
+            
+            # Extract text from Event->Content->Parts
+            result_text = ""
+            if result is None:
+                raise ValueError("No result received from ADK Runner")
+            
+            content_obj = result.content if hasattr(result, 'content') else result
+            
+            if hasattr(content_obj, 'parts'):
+                for part in content_obj.parts:
+                    if hasattr(part, 'text'):
+                        result_text += part.text
+            elif hasattr(content_obj, 'text'):
+                result_text = content_obj.text
             else:
-                analysis_text += "This indicates stable public interest in this topic."
+                result_text = str(content_obj)
+            
+            if not result_text or not isinstance(result_text, str):
+                raise ValueError(f"No valid text extracted. Got type: {type(result_text)}")
+            
+            # Strip markdown wrappers
+            result_text = result_text.strip()
+            if result_text.startswith('```json'):
+                result_text = result_text[7:]
+            if result_text.startswith('```'):
+                result_text = result_text[3:]
+            if result_text.endswith('```'):
+                result_text = result_text[:-3]
+            result_text = result_text.strip()
+            
+            # Parse JSON response
+            parsed_result = json.loads(result_text)
+            
+            # Extract analysis from ADK response
+            keyword = parsed_result.get('keyword', request.keyword)
+            trend_direction = parsed_result.get('trend_direction', 'unknown')
+            summary = parsed_result.get('summary', '')
+            statistics = parsed_result.get('statistics', {})
             
             trend_analysis = {
-                "keyword": request.keyword,
-                "analysis": analysis_text,
+                "keyword": keyword,
+                "analysis": summary,
                 "status": "completed",
+                "trend_direction": trend_direction,
+                "statistics": statistics
+            }
+            
+        except Exception as adk_error:
+            logger.error(f"ADK Runner error: {str(adk_error)}", exc_info=True)
+            # Fallback to basic analysis
+            stats = plot_data.get("statistics", {})
+            trend_direction = stats.get("trend_direction", "unknown")
+            trend_analysis = {
+                "keyword": request.keyword,
+                "analysis": f"Trend direction: {trend_direction}. ADK error: {str(adk_error)}",
+                "status": "fallback",
                 "trend_direction": trend_direction,
                 "statistics": stats
             }
         
-        logger.info(f"Trends data fetched successfully for: {request.keyword}")
+        logger.info(f"Trends analysis completed for: {request.keyword}")
         
         return TrendsResponse(
             keyword=request.keyword,
@@ -258,4 +307,5 @@ The search interest for '{request.keyword}' is currently {trend_direction}. """
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8003)
+    port = int(os.environ.get("PORT", 8003))
+    uvicorn.run(app, host="0.0.0.0", port=port)

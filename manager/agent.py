@@ -1,6 +1,8 @@
 """
 Manager agent that orchestrates search and sentiment analysis via HTTP microservices.
 """
+import os
+import time
 import httpx
 import logging
 from typing import Dict, Any, List, Optional
@@ -10,10 +12,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Service configuration
-SEARCH_SERVICE_URL = "http://localhost:8001"
-SENTIMENT_SERVICE_URL = "http://localhost:8002"
-TRENDS_SERVICE_URL = "http://localhost:8003"
+# Service configuration - use environment variables for Cloud Run deployment
+SEARCH_SERVICE_URL = os.getenv("SEARCH_AGENT_URL", "http://localhost:8001")
+SENTIMENT_SERVICE_URL = os.getenv("SENTIMENT_AGENT_URL", "http://localhost:8002")
+TRENDS_SERVICE_URL = os.getenv("TRENDS_AGENT_URL", "http://localhost:8003")
+FACTCHECK_SERVICE_URL = os.getenv("FACTCHECK_AGENT_URL", "http://localhost:8004")
 REQUEST_TIMEOUT = 60.0  # seconds (increased for AI processing)
 MAX_RETRIES = 3
 
@@ -29,11 +32,13 @@ class ManagerAgent:
         search_url: str = SEARCH_SERVICE_URL,
         sentiment_url: str = SENTIMENT_SERVICE_URL,
         trends_url: str = TRENDS_SERVICE_URL,
+        factcheck_url: str = FACTCHECK_SERVICE_URL,
         timeout: float = REQUEST_TIMEOUT
     ):
         self.search_url = search_url
         self.sentiment_url = sentiment_url
         self.trends_url = trends_url
+        self.factcheck_url = factcheck_url
         self.timeout = timeout
         self.client = httpx.Client(timeout=timeout)
     
@@ -115,22 +120,66 @@ class ManagerAgent:
         Returns:
             Dict containing trend analysis
         """
+        max_retries = 3
+        retry_delay = 5  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Calling trends service for keyword: {keyword} (attempt {attempt + 1}/{max_retries})")
+                response = self.client.post(
+                    f"{self.trends_url}/run",
+                    json={"keyword": keyword},
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                result = response.json()
+                logger.info(f"Trends service completed analysis")
+                return result
+            except httpx.ConnectError as e:
+                logger.warning(f"Connection error to trends service (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(f"Trends service unavailable after {max_retries} attempts")
+                    raise
+            except httpx.HTTPError as e:
+                logger.error(f"HTTP error calling trends service: {e}")
+                raise
+            except Exception as e:
+                logger.error(f"Error calling trends service: {e}")
+                raise
+    
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    def _call_factcheck_service(self, headlines: List[str]) -> Dict[str, Any]:
+        """
+        Call the fact-check microservice with retry logic.
+        
+        Args:
+            headlines: List of headlines to check for contradictions
+            
+        Returns:
+            Dict containing fact-check analysis
+        """
         try:
-            logger.info(f"Calling trends service for keyword: {keyword}")
+            logger.info(f"Calling fact-check service with {len(headlines)} headlines")
             response = self.client.post(
-                f"{self.trends_url}/run",
-                json={"keyword": keyword},
+                f"{self.factcheck_url}/run",
+                json={"headlines": headlines},
                 timeout=self.timeout
             )
             response.raise_for_status()
             result = response.json()
-            logger.info(f"Trends service completed analysis")
+            logger.info(f"Fact-check service completed analysis")
             return result
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error calling trends service: {e}")
+            logger.error(f"HTTP error calling fact-check service: {e}")
             raise
         except Exception as e:
-            logger.error(f"Error calling trends service: {e}")
+            logger.error(f"Error calling fact-check service: {e}")
             raise
     
     def check_services_health(self) -> Dict[str, bool]:
@@ -162,6 +211,13 @@ class ManagerAgent:
         except Exception as e:
             logger.warning(f"Trends service health check failed: {e}")
             health_status["trends_service"] = False
+        
+        try:
+            response = self.client.get(f"{self.factcheck_url}/health", timeout=5.0)
+            health_status["factcheck_service"] = response.status_code == 200
+        except Exception as e:
+            logger.warning(f"Fact-check service health check failed: {e}")
+            health_status["factcheck_service"] = False
         
         return health_status
     
@@ -211,13 +267,25 @@ class ManagerAgent:
             # Step 2: Analyze sentiment
             sentiment_results = self._call_sentiment_service(headlines)
             
-            # Step 3: Compile comprehensive report
+            # Step 3: Fact-check for contradictions and controversial claims
+            factcheck_results = None
+            try:
+                factcheck_results = self._call_factcheck_service(headlines)
+            except Exception as e:
+                logger.warning(f"Fact-check service failed, continuing without it: {e}")
+                factcheck_results = {
+                    "error": str(e),
+                    "status": "unavailable"
+                }
+            
+            # Step 4: Compile comprehensive report
             report = {
                 "query": query,
                 "search_results": search_results,
                 "sentiment_analysis": sentiment_results,
+                "factcheck_analysis": factcheck_results,
                 "summary": self._generate_summary(
-                    query, headlines_data, sentiment_results
+                    query, headlines_data, sentiment_results, factcheck_results
                 )
             }
             
@@ -348,8 +416,15 @@ class ManagerAgent:
                 logger.info(f"Trends analysis added for query: {query}")
             except Exception as e:
                 logger.warning(f"Trends analysis failed, continuing without it: {e}")
+                # Provide a proper structure that frontend expects
                 report["trends_analysis"] = {
-                    "error": str(e),
+                    "keyword": query,
+                    "trend_analysis": {
+                        "analysis": f"Unable to fetch Google Trends data: {str(e)}",
+                        "status": "failed",
+                        "error": str(e)
+                    },
+                    "plot_data": None,
                     "status": "failed"
                 }
             
@@ -367,7 +442,8 @@ class ManagerAgent:
         self,
         query: str,
         headlines_data: List[Dict],
-        sentiment_results: Dict
+        sentiment_results: Dict,
+        factcheck_results: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         Generate a comprehensive summary report including sentiment, fact check, 
@@ -377,6 +453,7 @@ class ManagerAgent:
             query: Original search query
             headlines_data: Raw headline data from search
             sentiment_results: Sentiment analysis results
+            factcheck_results: Fact-check analysis results (optional)
             
         Returns:
             Dict containing various report sections
@@ -409,8 +486,19 @@ Headlines and their Sentiment:"""
             sentiment = item.get("sentiment", "neutral").capitalize()
             sentiment_summary += f"\n• {headline} - **{sentiment}**"
         
-        # Fact Check Report
-        fact_check = f"""Fact Check Report:
+        # Fact Check Report - Use AI-powered analysis if available
+        if factcheck_results and factcheck_results.get("status") == "success":
+            ai_analysis = factcheck_results.get("analysis", "")
+            fact_check = f"""Fact Check Report:
+AI-Powered Contradiction and Controversy Analysis for '{query}':
+
+{ai_analysis}
+
+---
+This analysis was performed by our fact-check agent which examined all {total} headlines for contradictions, controversial claims, and potential misinformation."""
+        else:
+            # Fallback to basic fact check if AI service unavailable
+            fact_check = f"""Fact Check Report:
 Here's a breakdown of verifiable information and discrepancies based on the search results for '{query}'.
 
 Verifiable Facts:
@@ -423,7 +511,9 @@ Discrepancies/Differently Stated Information:
 • The language used to describe events may vary from neutral reporting to more critical or supportive tones.
 
 Conclusion of Fact Check:
-While most news sources provide similar accounts of the core facts, there may be variations in framing, emphasis, and interpretation. For critical information, cross-referencing multiple sources and checking primary sources is recommended. The presence of {total} different headlines suggests this is a widely reported topic with multiple perspectives available."""
+While most news sources provide similar accounts of the core facts, there may be variations in framing, emphasis, and interpretation. For critical information, cross-referencing multiple sources and checking primary sources is recommended. The presence of {total} different headlines suggests this is a widely reported topic with multiple perspectives available.
+
+Note: Advanced AI-powered fact-check analysis is currently unavailable."""
         
         # Bias Check Report
         bias_check = f"""Bias Check Report:

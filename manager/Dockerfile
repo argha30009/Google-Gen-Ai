@@ -11,9 +11,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the manager code
 COPY agent.py .
-COPY __init__.py . 2>/dev/null || echo "# Manager Agent" > __init__.py
+COPY server.py .
 
-# The manager doesn't expose a port - it's a client that calls other services
-# You can run it interactively or as a script
+# Create a minimal __init__.py file
+RUN echo "# Manager Agent" > __init__.py
 
-CMD ["python", "-c", "from agent import root_agent; print('Manager agent ready. Use root_agent.run(query) to execute.')"]
+# Expose port for the FastAPI server
+EXPOSE 8000
+
+# Run the FastAPI server
+CMD ["python", "server.py"]

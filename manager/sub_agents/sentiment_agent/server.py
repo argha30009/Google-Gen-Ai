@@ -7,9 +7,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import logging
+import json
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
-import google.genai.types as types
+from google.genai import types
 import uuid
 
 # Load environment variables from .env file if it exists
@@ -94,7 +95,7 @@ async def health_check():
 @app.post("/run", response_model=SentimentResponse)
 async def run_sentiment_analysis(request: SentimentRequest):
     """
-    Execute sentiment agent to analyze headlines.
+    Execute sentiment agent using ADK Runner to analyze headlines.
     
     Args:
         request: SentimentRequest containing list of headlines
@@ -111,89 +112,103 @@ async def run_sentiment_analysis(request: SentimentRequest):
                 detail="Headlines list cannot be empty"
             )
         
-        # Generate unique IDs for this request
-        user_id = "api_user"
-        session_id = str(uuid.uuid4())
-        
-        # Create session first
-        await runner.session_service.create_session(
-            user_id=user_id,
-            session_id=session_id,
-            app_name="sentiment_agent_app"
-        )
-        
-        # Format the input as a prompt for the agent
-        headlines_text = "\n".join([f"- {h}" for h in request.headlines])
-        prompt = f"Analyze the sentiment of these headlines:\n{headlines_text}"
-        
-        # Execute the sentiment agent using Runner (async)
-        full_response = ""
-        
-        # Create proper Content message
-        message = types.Content(
-            role='user',
-            parts=[types.Part(text=prompt)]
-        )
-        
-        async for event in runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=message
-        ):
-            # Collect agent response from events
-            if hasattr(event, 'content') and event.content:
-                full_response += str(event.content)
-            elif hasattr(event, 'text') and event.text:
-                full_response += str(event.text)
-        
-        # Parse the agent's response
-        per_item = []
-        sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
-        
-        # Simple sentiment detection from response
-        response_lower = full_response.lower()
-        
-        for headline in request.headlines:
-            # Basic sentiment detection
-            sentiment = "neutral"
-            if "positive" in response_lower or "good" in response_lower or "optimistic" in response_lower:
-                sentiment = "positive"
-                sentiment_counts["positive"] += 1
-            elif "negative" in response_lower or "bad" in response_lower or "pessimistic" in response_lower:
-                sentiment = "negative"
-                sentiment_counts["negative"] += 1
-            else:
-                sentiment_counts["neutral"] += 1
+        # Use ADK Runner pattern
+        try:
+            # Create session
+            user_id = "default_user"
+            session_id = str(uuid.uuid4())
+            await runner.session_service.create_session(
+                app_name="sentiment_agent_app",
+                user_id=user_id,
+                session_id=session_id
+            )
             
-            per_item.append({
-                "headline": headline,
-                "sentiment": sentiment,
-                "analysis": full_response[:200] if full_response else "Analysis completed"
-            })
-        
-        # Determine overall sentiment
-        total = len(request.headlines)
-        if sentiment_counts["positive"] > total / 2:
-            overall = "positive"
-        elif sentiment_counts["negative"] > total / 2:
-            overall = "negative"
-        else:
-            overall = "mixed"
-        
-        response = {
-            "sentiment_summary": {
-                "overall": overall,
-                "positive_count": sentiment_counts["positive"],
-                "negative_count": sentiment_counts["negative"],
-                "neutral_count": sentiment_counts["neutral"],
-                "total_analyzed": total,
-                "full_analysis": full_response if full_response else "No analysis available"
-            },
-            "per_item": per_item
-        }
-        
-        logger.info(f"Sentiment analysis completed for {len(request.headlines)} headlines")
-        return response
+            # Create message with proper Content object
+            headlines_json = json.dumps(request.headlines)
+            message_content = types.Content(
+                role="user",
+                parts=[types.Part(text=f"Analyze sentiment for these headlines: {headlines_json}")]
+            )
+            
+            # Call ADK Runner
+            result_generator = runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=message_content
+            )
+            
+            # Collect results from async generator
+            result = None
+            async for chunk in result_generator:
+                result = chunk
+            
+            # Extract text from Event->Content->Parts
+            result_text = ""
+            if result is None:
+                raise ValueError("No result received from ADK Runner")
+            
+            content_obj = result.content if hasattr(result, 'content') else result
+            
+            if hasattr(content_obj, 'parts'):
+                for part in content_obj.parts:
+                    if hasattr(part, 'text'):
+                        result_text += part.text
+            elif hasattr(content_obj, 'text'):
+                result_text = content_obj.text
+            else:
+                result_text = str(content_obj)
+            
+            if not result_text or not isinstance(result_text, str):
+                raise ValueError(f"No valid text extracted. Got type: {type(result_text)}")
+            
+            # Strip markdown wrappers
+            result_text = result_text.strip()
+            if result_text.startswith('```json'):
+                result_text = result_text[7:]
+            if result_text.startswith('```'):
+                result_text = result_text[3:]
+            if result_text.endswith('```'):
+                result_text = result_text[:-3]
+            result_text = result_text.strip()
+            
+            # Parse JSON response
+            parsed_result = json.loads(result_text)
+            
+            # Extract data from ADK response
+            per_headline = parsed_result.get('per_headline', [])
+            distribution = parsed_result.get('distribution', {})
+            overall_summary = parsed_result.get('overall_summary', '')
+            
+            # Determine overall sentiment
+            total = len(request.headlines)
+            if distribution.get('positive', 0) > total / 2:
+                overall = "positive"
+            elif distribution.get('negative', 0) > total / 2:
+                overall = "negative"
+            else:
+                overall = "mixed"
+            
+            response = {
+                "sentiment_summary": {
+                    "overall": overall,
+                    "positive_count": distribution.get('positive', 0),
+                    "negative_count": distribution.get('negative', 0),
+                    "neutral_count": distribution.get('neutral', 0),
+                    "total_analyzed": total,
+                    "full_analysis": overall_summary
+                },
+                "per_item": per_headline
+            }
+            
+            logger.info(f"Sentiment analysis completed for {len(request.headlines)} headlines")
+            return response
+            
+        except Exception as adk_error:
+            logger.error(f"ADK Runner error: {str(adk_error)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"ADK Runner error: {str(adk_error)}"
+            )
         
     except HTTPException:
         raise
@@ -207,4 +222,5 @@ async def run_sentiment_analysis(request: SentimentRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    port = int(os.environ.get("PORT", 8002))
+    uvicorn.run(app, host="0.0.0.0", port=port)

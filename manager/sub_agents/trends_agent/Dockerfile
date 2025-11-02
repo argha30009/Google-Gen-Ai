@@ -1,4 +1,4 @@
-# Search Agent Microservice Dockerfile
+# Trends Agent Microservice Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -14,10 +14,10 @@ COPY agent.py .
 COPY server.py .
 
 # Create a minimal __init__.py file
-RUN echo "# Search Agent" > __init__.py
+RUN echo "# Trends Agent" > __init__.py
 
 # Expose port
-EXPOSE 8001
+EXPOSE 8003
 
-# Run the server (PORT environment variable will be read from server.py)
+# Run the server
 CMD ["python", "server.py"]

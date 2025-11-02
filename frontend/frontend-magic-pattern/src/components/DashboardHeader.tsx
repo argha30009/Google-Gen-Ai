@@ -7,7 +7,9 @@ export function DashboardHeader() {
 
   const handleSearch = async () => {
     if (query.trim()) {
+      console.log('🔎 DashboardHeader: Starting search for:', query);
       await fetchNews(query);
+      console.log('🔎 DashboardHeader: fetchNews completed');
     }
   };
 

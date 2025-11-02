@@ -61,11 +61,15 @@ export function NewsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    console.log('Fetching news for query:', query);
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8000/run', {
+      console.log('Sending request to backend...');
+      // Use Cloud Run URL if available, fallback to localhost
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://manager-agent-466223788759.asia-south1.run.app';
+      const response = await fetch(`${apiUrl}/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,17 +77,27 @@ export function NewsProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ query }),
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('✅ Received data:', data);
+      console.log('📰 Headlines count:', data.search_results?.headlines?.length);
+      console.log('💭 Sentiment data:', data.sentiment_analysis);
+      console.log('📋 Summary data:', data.summary);
+      
       setNewsData(data);
+      console.log('🎯 News data set successfully in context');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching news:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      console.error('❌ Error fetching news:', errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
+      console.log('🏁 Fetch complete, loading state set to false');
     }
   };
 

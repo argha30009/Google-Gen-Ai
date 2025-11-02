@@ -3,6 +3,9 @@ import { useNews } from '../context/NewsContext';
 export function HeadlineSummary() {
   const { newsData, loading } = useNews();
 
+  console.log('📰 HeadlineSummary render - loading:', loading, 'hasData:', !!newsData);
+  console.log('📰 Headlines:', newsData?.search_results?.headlines?.length);
+
   if (loading) {
     return <div className="bg-white rounded-lg border border-gray-200 p-5">
         <h2 className="text-base font-semibold text-gray-900 mb-4">
@@ -12,7 +15,8 @@ export function HeadlineSummary() {
       </div>;
   }
 
-  if (!newsData || !newsData.search_results.headlines.length) {
+  if (!newsData || !newsData.search_results?.headlines?.length) {
+    console.log('❌ HeadlineSummary: No headlines data', newsData);
     return <div className="bg-white rounded-lg border border-gray-200 p-5">
         <h2 className="text-base font-semibold text-gray-900 mb-4">
           Headline Summary

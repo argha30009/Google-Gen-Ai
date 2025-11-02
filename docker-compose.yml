@@ -39,21 +39,45 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  trends-agent:
+    build:
+      context: ./manager/sub_agents/trends_agent
+      dockerfile: Dockerfile
+    container_name: trends-agent-service
+    ports:
+      - "8003:8003"
+    networks:
+      - agent-network
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8003/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
   manager-agent:
     build:
       context: ./manager
       dockerfile: Dockerfile
     container_name: manager-agent
+    ports:
+      - "8000:8000"
     networks:
       - agent-network
     environment:
       - PYTHONUNBUFFERED=1
-      - SEARCH_SERVICE_URL=http://search-agent:8001
-      - SENTIMENT_SERVICE_URL=http://sentiment-agent:8002
+      - SEARCH_AGENT_URL=http://search-agent:8001
+      - SENTIMENT_AGENT_URL=http://sentiment-agent:8002
+      - TRENDS_AGENT_URL=http://trends-agent:8003
     depends_on:
       search-agent:
         condition: service_healthy
       sentiment-agent:
+        condition: service_healthy
+      trends-agent:
         condition: service_healthy
     restart: unless-stopped
     # Optional: Keep container running for interactive use

@@ -8,7 +8,9 @@ export function SearchBar() {
   const [query, setQuery] = useState('');
   const handleCheck = async () => {
     if (query.trim()) {
+      console.log('🔎 SearchBar: Starting search for:', query);
       await fetchNews(query);
+      console.log('🔎 SearchBar: fetchNews completed, navigating to dashboard');
       navigate('/dashboard');
     }
   };
