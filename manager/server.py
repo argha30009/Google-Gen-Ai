@@ -26,7 +26,9 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
-        "http://localhost:8000"
+        "http://localhost:8000",
+        "https://storage.googleapis.com",
+        "http://news-analysis-frontend-1762108971.storage.googleapis.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],

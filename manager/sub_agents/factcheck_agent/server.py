@@ -88,9 +88,11 @@ async def run_factcheck(request: FactCheckRequest) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
+    import os
+    port = int(os.getenv("PORT", 8004))
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8004,
+        port=port,
         reload=False
     )

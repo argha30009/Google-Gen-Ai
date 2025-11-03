@@ -12,6 +12,8 @@ export function Dashboard() {
 
   console.log('📊 Dashboard render - error:', error, 'hasData:', !!newsData);
 
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  
   return <div className="max-w-6xl mx-auto p-8">
       <DashboardHeader />
       {error && (
@@ -20,7 +22,7 @@ export function Dashboard() {
             <strong>Error:</strong> {error}
           </p>
           <p className="text-xs text-red-600 mt-1">
-            Please check that the backend services are running on localhost:8000
+            Please check that the backend services are running on {apiUrl}
           </p>
         </div>
       )}
