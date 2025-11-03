@@ -7,7 +7,13 @@ set -e
 
 PROJECT_ID=$(gcloud config get-value project)
 REGION="asia-south1"
-API_KEY="AIzaSyC0Q8jFLP3MJB2mQjrGcqxTOgovNkP3dn4"
+# API_KEY should be passed as environment variable
+# Usage: API_KEY="your-key-here" bash deploy_all_agents.sh
+if [ -z "$API_KEY" ]; then
+    echo "Error: API_KEY environment variable is not set"
+    echo "Usage: API_KEY='your-api-key' bash deploy_all_agents.sh"
+    exit 1
+fi
 
 echo "🚀 Starting deployment of all microservices..."
 echo "Project: $PROJECT_ID"

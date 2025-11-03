@@ -61,3 +61,13 @@ Thumbs.db
 # Project specific
 search_results.json
 test_output/
+
+# API Keys and Secrets (NEVER COMMIT THESE!)
+*.env
+.env*
+*_api_key*
+api_key.txt
+secrets/
+deploy_subagents.sh
+deploy_all_now.sh
+**/sub_agents/**/.env
