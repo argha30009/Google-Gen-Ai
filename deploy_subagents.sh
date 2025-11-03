@@ -5,7 +5,9 @@ set -e  # Exit on error
 
 PROJECT_ID="misinformation-detector-476811"
 REGION="asia-south1"
-API_KEY="AIzaSyC0Q8jFLP3MJB2mQjrGcqxTOgovNkP3dn4"
+# SECURITY: API_KEY should be passed as environment variable
+# Usage: API_KEY=your_key_here bash deploy_subagents.sh
+API_KEY="${GOOGLE_API_KEY}"
 
 echo "Building and deploying search agent..."
 cd manager/sub_agents/search_agent
