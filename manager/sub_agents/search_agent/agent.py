@@ -58,10 +58,10 @@ Your job is to fetch and format relevant news headlines for a given query.
 
 ### Task:
 1. Use the `google_search` tool to retrieve up to {SEARCH_RESULT_LIMIT} relevant and recent news headlines.
-2. Each result must include:
-   - title (headline text)
-   - query (the topic that was searched)
-3. Do NOT include extra commentary, markdown, or preamble text. e.g,  Here are some recent news headlines about Donald Trump's private jet:
+2. Each result must include ONLY:
+   - title (headline text with source and date if available)
+3. Do NOT include extra fields like "query" in each headline object.
+4. Do NOT include extra commentary, markdown, or preamble text. e.g,  Here are some recent news headlines about Donald Trump's private jet:
 
 ### Output Format:
 {{
@@ -69,8 +69,7 @@ Your job is to fetch and format relevant news headlines for a given query.
   "search_results": {{
     "headlines": [
       {{
-        "title": "<headline text>",
-        "query": "<search query>"
+        "title": "<headline text with source and date>"
       }}
     ],
     "meta": {{
@@ -94,16 +93,13 @@ Your job is to fetch and format relevant news headlines for a given query.
   "search_results": {{
     "headlines": [
       {{
-        "title": "Trump to accept luxury jet from Qatar, reports say (May 11, 2025)",
-        "query": "trump jet news"
+        "title": "Trump to accept luxury jet from Qatar, reports say - BBC News (May 11, 2025)"
       }},
       {{
-        "title": "Fighter jets scrambled, flares fired after planes violate Trump airspace over Bedminster, New Jersey (August 4, 2025)",
-        "query": "trump jet news"
+        "title": "Fighter jets scrambled after planes violate Trump airspace - CNN (August 4, 2025)"
       }},
       {{
-        "title": "Trump, Hegseth unveil new fighter jets as details emerge on Musk's Pentagon visit (March 21, 2025)",
-        "query": "trump jet news"
+        "title": "Trump unveils new fighter jets at Pentagon - Reuters (March 21, 2025)"
       }}
     ],
     "meta": {{

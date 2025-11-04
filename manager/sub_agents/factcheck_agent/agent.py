@@ -19,75 +19,99 @@ class FactCheckAgent:
         """Initialize the fact-check agent with Gemini."""
         self.model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
-            system_instruction="""You are a Fact Check Analysis Agent that reviews multiple news headlines
-for factual accuracy, contradictions, and misleading claims.
+            system_instruction="""You are an Expert Fact Check Analysis Agent that reviews news headlines
+for factual accuracy, contradictions, misleading claims, and provides clear TRUE/FALSE verdicts.
 
-Analyze the given headlines and produce both a JSON summary and
-a Markdown-formatted report for user display.
+Your analysis must be visually appealing, well-structured, and easy to scan.
 
 ✅ OUTPUT FORMAT (JSON)
 
 {
-  "query": "nvidia stocks news",
   "factcheck_summary": {
-    "overall_assessment": "Concise overview of the factual consistency of headlines.",
+    "overall_assessment": "One sentence summary of factual consistency",
+    "verdict": "MOSTLY_TRUE|MIXED|MOSTLY_FALSE|UNVERIFIABLE",
     "contradictions": [
       {
-        "claim": "string (the headline text or main claim)",
-        "source": "string (e.g., The Guardian, Reuters)",
-        "issue": "string (why it's wrong, biased, or inconsistent)",
+        "claim": "Exact headline or specific claim",
+        "source": "Source name from headline",
+        "verdict": "TRUE|FALSE|MISLEADING|UNVERIFIABLE",
+        "issue": "What's problematic about this claim",
         "severity": "Low|Medium|High",
-        "explanation": "brief factual clarification"
+        "explanation": "Clear factual clarification (1-2 sentences)"
       }
     ],
-    "supporting_evidence": ["list of verified or consistent facts"],
-    "context": "short background explanation",
-    "conclusion": "final one-line verdict"
+    "supporting_evidence": ["✓ Verified fact 1", "✓ Verified fact 2"],
+    "context": "Brief background (2-3 sentences)",
+    "conclusion": "Final verdict statement"
   },
-  "formatted_markdown": "clean markdown representation for display"
+  "formatted_markdown": "Beautiful markdown with emojis and structure"
 }
 
-🧱 MARKDOWN OUTPUT RULES
+🎨 BEAUTIFUL MARKDOWN FORMAT
 
-The Markdown should follow this exact, minimal, and beautiful structure:
+Create a visually stunning, easy-to-scan report with this EXACT structure:
 
-## Overall Assessment
+---
 
-One or two sentences summarizing how consistent or accurate the headlines are.
+## 📊 Overall Verdict: [MOSTLY TRUE / MIXED / MOSTLY FALSE / UNVERIFIABLE]
 
-## Contradictions or False Claims
+[One punchy sentence about the overall factual consistency]
 
-**🔹 Claim:** "Exact headline or claim"  
-**🔹 Source:** Publisher(s)  
-**🔹 Issue:** Short description of the inaccuracy or inconsistency  
-**🔹 Severity:** 🟢 Low | 🟠 Medium | 🔴 High  
-**🔹 Explanation:** A short neutral clarification (one or two sentences).
+---
 
-## Supporting Evidence
+## 🔍 Fact Check Analysis
 
-✅ Fact 1 (verified data)  
-🧾 Fact 2 (credible citation)  
-📰 Fact 3 (consistent source)
+### ✅ Claim #1: "[Exact headline or claim]"
 
-## Context & Sources
+**� Source:** [Publisher/Source]  
+**⚖️ Verdict:** ✓ TRUE | ✗ FALSE | ⚠️ MISLEADING | ❓ UNVERIFIABLE  
+**🎯 Severity:** 🟢 Low | 🟠 Medium | 🔴 High  
 
-Provide short factual background about the topic in 1–2 sentences.
+**� Analysis:**  
+[Clear 1-2 sentence explanation of why this is true/false/misleading]
 
-## Conclusion
+---
 
-Final, concise statement summarizing factual accuracy or bias of the news cluster.
+### ✅ Claim #2: "[Another claim if exists]"
 
-🧩 STYLE RULES
+[Same format as above]
 
-- Always bold the field names (Claim, Source, etc.)
-- Always wrap the claim/headline in double quotes
-- Use emojis for readability:
-  - 🟢 Low severity
-  - 🟠 Medium severity
-  - 🔴 High severity
-- Never start the report with "Fact Check Report:" — begin directly with "## Overall Assessment".
-- Keep formatting clean with one blank line between sections.
-- Be objective, factual, and concise — no redundant introductions.""",
+---
+
+## ✓ Supporting Facts
+
+• [Verified fact 1 with source or context]  
+• [Verified fact 2 with source or context]  
+• [Verified fact 3 with source or context]
+
+---
+
+## 📚 Context
+
+[2-3 sentences of relevant background information about the topic]
+
+---
+
+## 🎯 Final Verdict
+
+[Clear, authoritative conclusion about the overall factual accuracy]
+
+---
+
+🧩 FORMATTING RULES
+
+- Use clear visual separators (---) between sections
+- Always show verdict with appropriate emoji: ✓ TRUE / ✗ FALSE / ⚠️ MISLEADING / ❓ UNVERIFIABLE
+- Use consistent emojis:
+  - � Overall Verdict
+  - � Analysis sections
+  - ✅ Individual claims
+  - ✓ Supporting facts (bullet points)
+  - 📚 Context
+  - 🎯 Final Verdict
+  - 🟢 Low severity / 🟠 Medium / 🔴 High
+- Keep sections clean with proper spacing
+- Be direct and authoritative, no fluff""",
             generation_config={
                 "response_mime_type": "application/json"
             }
@@ -109,33 +133,35 @@ Final, concise statement summarizing factual accuracy or bias of the news cluste
 
 {chr(10).join(f"{i+1}. {h}" for i, h in enumerate(headlines))}
 
-CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. NO additional text before or after.
+CRITICAL: Respond with ONLY valid JSON. NO text before or after.
 
 Required JSON structure:
 {{
   "factcheck_summary": {{
-    "overall_assessment": "one sentence summary",
+    "overall_assessment": "one clear sentence",
+    "verdict": "MOSTLY_TRUE|MIXED|MOSTLY_FALSE|UNVERIFIABLE",
     "contradictions": [
       {{
-        "claim": "exact headline text",
-        "source": "headline number or source",
-        "issue": "what's wrong or inconsistent",
+        "claim": "exact headline",
+        "source": "publisher name",
+        "verdict": "TRUE|FALSE|MISLEADING|UNVERIFIABLE",
+        "issue": "what's wrong",
         "severity": "Low|Medium|High",
-        "explanation": "brief clarification"
+        "explanation": "factual clarification"
       }}
     ],
-    "supporting_evidence": ["verified fact 1", "verified fact 2"],
-    "context": "brief background",
-    "conclusion": "final verdict"
+    "supporting_evidence": ["• fact 1", "• fact 2"],
+    "context": "2-3 sentence background",
+    "conclusion": "authoritative verdict"
   }},
-  "formatted_markdown": "## Overall Assessment\\n\\n[Your formatted analysis with emojis as specified]\\n\\n## Contradictions or False Claims\\n\\n..."
+  "formatted_markdown": "---\\n\\n## 📊 Overall Verdict: [VERDICT]\\n\\n[assessment]\\n\\n---\\n\\n## 🔍 Fact Check Analysis\\n\\n### ✅ Claim #1: \\"[claim]\\"\\n\\n**📍 Source:** [source]\\n**⚖️ Verdict:** [✓ TRUE / ✗ FALSE / ⚠️ MISLEADING / ❓ UNVERIFIABLE]\\n**🎯 Severity:** [🟢 Low / 🟠 Medium / 🔴 High]\\n\\n**💡 Analysis:**\\n[explanation]\\n\\n---\\n\\n## ✓ Supporting Facts\\n\\n• [fact 1]\\n• [fact 2]\\n\\n---\\n\\n## 📚 Context\\n\\n[context]\\n\\n---\\n\\n## 🎯 Final Verdict\\n\\n[conclusion]\\n\\n---"
 }}
 
-Remember: 
-- Use 🔹 for claim markers
-- Use 🟢🟠🔴 for severity indicators
-- Use ✅🧾📰 for evidence markers
-- Follow exact heading structure: ## Overall Assessment, ## Contradictions or False Claims, ## Supporting Evidence, ## Context & Sources, ## Conclusion"""
+CRITICAL FORMATTING:
+- Always assign clear verdict: ✓ TRUE / ✗ FALSE / ⚠️ MISLEADING / ❓ UNVERIFIABLE
+- Use visual separators (---) between all sections
+- Include all emojis as specified: 📊 🔍 ✅ ⚖️ 🎯 📚 ✓
+- Make analysis punchy and authoritative"""
 
             # Run the agent
             response = self.model.generate_content(prompt)
