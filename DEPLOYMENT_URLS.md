@@ -1,4 +1,4 @@
-# íº€ DEPLOYMENT SUMMARY - Google Cloud Platform
+# ï¿½ï¿½ï¿½ DEPLOYMENT SUMMARY - Google Cloud Platform
 
 ## âœ… Backend Microservices (Cloud Run)
 
@@ -24,24 +24,26 @@ All services deployed in **asia-south1** region:
 - Health: https://factcheck-agent-betutdirna-el.a.run.app/health
 - Docs: https://factcheck-agent-betutdirna-el.a.run.app/docs
 
-### 5. **Manager Agent (Main API)**
-- URL: https://manager-agent-betutdirna-el.a.run.app
-- Health: https://manager-agent-betutdirna-el.a.run.app/health
-- API: https://manager-agent-betutdirna-el.a.run.app/run
-- Docs: https://manager-agent-betutdirna-el.a.run.app/docs
+### 5. **Manager Agent (Main API)** âœ… UPDATED
+- URL: https://manager-agent-466223788759.asia-south1.run.app
+- Health: https://manager-agent-466223788759.asia-south1.run.app/health
+- API: https://manager-agent-466223788759.asia-south1.run.app/run
+- Docs: https://manager-agent-466223788759.asia-south1.run.app/docs
+- **Previous URL** (deprecated): https://manager-agent-betutdirna-el.a.run.app
 
-## í¾¨ Frontend (Google Cloud Storage)
+## ğŸŒ Frontend (Google Cloud Storage) âœ… UPDATED
 
-- **Main URL**: https://storage.googleapis.com/news-analysis-frontend-1762108971/index.html
-- **Bucket**: gs://news-analysis-frontend-1762108971
+- **Main URL**: https://storage.googleapis.com/clipse-app/index.html
+- **Bucket**: gs://clipse-app
+- **Previous Bucket** (deprecated): gs://news-analysis-frontend-1762108971
 
-## í³‹ Project Details
+## ï¿½ï¿½ï¿½ Project Details
 
 - **Project ID**: misinformation-detector-476811
 - **Region**: asia-south1
 - **Deployment Date**: November 2, 2025
 
-## í·ª Testing the API
+## ï¿½ï¿½ï¿½ Testing the API
 
 ```bash
 curl -X POST https://manager-agent-betutdirna-el.a.run.app/run \
@@ -49,7 +51,7 @@ curl -X POST https://manager-agent-betutdirna-el.a.run.app/run \
   -d '{"query": "artificial intelligence news"}'
 ```
 
-## í´„ Redeployment Commands
+## ï¿½ï¿½ï¿½ Redeployment Commands
 
 ### Redeploy a specific service:
 ```bash
@@ -64,7 +66,7 @@ npm run build
 gsutil -m cp -r dist/* gs://news-analysis-frontend-1762108971/
 ```
 
-## í³Š Monitoring
+## ï¿½ï¿½ï¿½ Monitoring
 
 View logs in Google Cloud Console:
 - Cloud Run Logs: https://console.cloud.google.com/run?project=misinformation-detector-476811

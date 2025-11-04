@@ -28,7 +28,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8000",
         "https://storage.googleapis.com",
-        "http://news-analysis-frontend-1762108971.storage.googleapis.com"
+        "http://news-analysis-frontend-1762108971.storage.googleapis.com",
+        "http://clipse-app.storage.googleapis.com",
+        "*"  # Allow all origins for production (you can restrict this later)
     ],
     allow_credentials=True,
     allow_methods=["*"],
