@@ -19,37 +19,42 @@ class FactCheckAgent:
         """Initialize the fact-check agent with Gemini."""
         self.model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
-            system_instruction="""You are an Expert Fact Check Analysis Agent that reviews news headlines
-for factual accuracy, contradictions, misleading claims, and provides clear TRUE/FALSE verdicts.
+            system_instruction="""You are an Expert Fact Check Analysis Agent that provides comprehensive verification analysis of news headlines.
 
-Your analysis must be visually appealing, well-structured, and easy to scan.
+Your analysis must state clear VERIFIABILITY (verifiable/unverifiable/partially verifiable) and include detailed factual assessment.
 
 ✅ OUTPUT FORMAT (JSON)
 
 {
   "factcheck_summary": {
-    "overall_assessment": "One sentence summary of factual consistency",
+    "verification_status": "VERIFIABLE|PARTIALLY_VERIFIABLE|UNVERIFIABLE|CONTRADICTORY",
+    "overall_assessment": "Comprehensive 2-4 sentence summary stating what IS verifiable",
     "verdict": "MOSTLY_TRUE|MIXED|MOSTLY_FALSE|UNVERIFIABLE",
+    "verifiable_facts": [
+      "Specific verifiable fact 1 with details",
+      "Specific verifiable fact 2 with numbers/dates",
+      "Specific verifiable fact 3 about core event"
+    ],
     "contradictions": [
       {
-        "claim": "Exact headline or specific claim",
-        "source": "Source name from headline",
-        "verdict": "TRUE|FALSE|MISLEADING|UNVERIFIABLE",
-        "issue": "What's problematic about this claim",
+        "claim": "Exact headline",
+        "source": "Source name",
+        "verdict": "VERIFIED|UNVERIFIED|MISLEADING|FALSE",
+        "issue": "What's problematic",
         "severity": "Low|Medium|High",
-        "explanation": "Clear factual clarification (1-2 sentences)"
+        "explanation": "Detailed clarification"
       }
     ],
-    "supporting_evidence": ["✓ Verified fact 1", "✓ Verified fact 2"],
-    "context": "Brief background (2-3 sentences)",
-    "conclusion": "Final verdict statement"
+    "areas_of_concern": ["Ethical concern 1", "Interpretive difference 1"],
+    "context": "Background information (2-3 sentences)",
+    "conclusion": "Comprehensive conclusion about verifiability and where discrepancies lie"
   },
-  "formatted_markdown": "Beautiful markdown with emojis and structure"
+  "formatted_markdown": "Detailed markdown report"
 }
 
-🎨 BEAUTIFUL MARKDOWN FORMAT
+🎨 COMPREHENSIVE MARKDOWN FORMAT
 
-Create a visually stunning, easy-to-scan report with this EXACT structure:
+Create a detailed, professional fact-check report that clearly states VERIFIABILITY:
 
 ---
 
@@ -129,7 +134,7 @@ Create a visually stunning, easy-to-scan report with this EXACT structure:
         """
         try:
             # Create the prompt
-            prompt = f"""Analyze these headlines for factual accuracy, contradictions, and misleading claims:
+            prompt = f"""Analyze these headlines for factual accuracy and verifiability:
 
 {chr(10).join(f"{i+1}. {h}" for i, h in enumerate(headlines))}
 
@@ -138,30 +143,31 @@ CRITICAL: Respond with ONLY valid JSON. NO text before or after.
 Required JSON structure:
 {{
   "factcheck_summary": {{
-    "overall_assessment": "one clear sentence",
+    "overall_assessment": "2-4 sentences that START with 'Based on the news headlines, it is VERIFIABLE/UNVERIFIABLE that...' and include specific details",
     "verdict": "MOSTLY_TRUE|MIXED|MOSTLY_FALSE|UNVERIFIABLE",
     "contradictions": [
       {{
         "claim": "exact headline",
         "source": "publisher name",
-        "verdict": "TRUE|FALSE|MISLEADING|UNVERIFIABLE",
-        "issue": "what's wrong",
+        "verdict": "VERIFIED|UNVERIFIED|MISLEADING|FALSE",
+        "issue": "what's wrong or what's confirmed",
         "severity": "Low|Medium|High",
-        "explanation": "factual clarification"
+        "explanation": "detailed clarification"
       }}
     ],
-    "supporting_evidence": ["• fact 1", "• fact 2"],
+    "supporting_evidence": ["specific verifiable fact 1", "specific verifiable fact 2"],
     "context": "2-3 sentence background",
-    "conclusion": "authoritative verdict"
+    "conclusion": "comprehensive conclusion that states what aligns vs where discrepancies lie"
   }},
-  "formatted_markdown": "---\\n\\n## 📊 Overall Verdict: [VERDICT]\\n\\n[assessment]\\n\\n---\\n\\n## 🔍 Fact Check Analysis\\n\\n### ✅ Claim #1: \\"[claim]\\"\\n\\n**📍 Source:** [source]\\n**⚖️ Verdict:** [✓ TRUE / ✗ FALSE / ⚠️ MISLEADING / ❓ UNVERIFIABLE]\\n**🎯 Severity:** [🟢 Low / 🟠 Medium / 🔴 High]\\n\\n**💡 Analysis:**\\n[explanation]\\n\\n---\\n\\n## ✓ Supporting Facts\\n\\n• [fact 1]\\n• [fact 2]\\n\\n---\\n\\n## 📚 Context\\n\\n[context]\\n\\n---\\n\\n## 🎯 Final Verdict\\n\\n[conclusion]\\n\\n---"
+  "formatted_markdown": "Fact Check Report:\\n\\nBased on the news headlines, it is [VERIFIABLE/UNVERIFIABLE] that [detailed summary with specifics]. [Mention concerns or debates]. [State what aligns vs what differs].\\n\\n---\\n\\nVerifiable Facts:\\n\\n• [specific fact 1]\\n• [specific fact 2]\\n• [specific fact 3]\\n\\n---\\n\\nDiscrepancies/Differently Stated Information:\\n\\n• [different framing]\\n• [varying perspectives]\\n\\n---\\n\\nConclusion of Fact Check:\\n\\n[Comprehensive conclusion about factual consistency, where sources align, and where they differ]\\n\\nNote: Advanced AI-powered fact-check analysis is currently unavailable."
 }}
 
-CRITICAL FORMATTING:
-- Always assign clear verdict: ✓ TRUE / ✗ FALSE / ⚠️ MISLEADING / ❓ UNVERIFIABLE
-- Use visual separators (---) between all sections
-- Include all emojis as specified: 📊 🔍 ✅ ⚖️ 🎯 📚 ✓
-- Make analysis punchy and authoritative"""
+CRITICAL REQUIREMENTS:
+- MUST use "it is verifiable that" or "it is unverifiable that" language
+- Include specific details: numbers, dates, entities, values
+- Distinguish factual agreement from interpretive differences
+- Be comprehensive and detailed
+- State where headlines align on core facts vs differ in interpretation"""
 
             # Run the agent
             response = self.model.generate_content(prompt)
