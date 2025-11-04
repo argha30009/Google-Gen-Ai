@@ -32,6 +32,7 @@ agent = create_agent()
 class FactCheckRequest(BaseModel):
     """Request model for fact-check analysis."""
     headlines: List[str]
+    query: str = None  # Optional original user query for context
 
 
 class FactCheckResponse(BaseModel):
@@ -74,7 +75,7 @@ async def run_factcheck(request: FactCheckRequest) -> Dict[str, Any]:
         if not request.headlines:
             raise HTTPException(status_code=400, detail="No headlines provided")
         
-        result = agent.analyze(request.headlines)
+        result = agent.analyze(request.headlines, query=request.query)
         
         if result.get("status") == "error":
             raise HTTPException(status_code=500, detail=result.get("error"))

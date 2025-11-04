@@ -154,12 +154,13 @@ class ManagerAgent:
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=2, max=10)
     )
-    def _call_factcheck_service(self, headlines: List[str]) -> Dict[str, Any]:
+    def _call_factcheck_service(self, headlines: List[str], query: Optional[str] = None) -> Dict[str, Any]:
         """
         Call the fact-check microservice with retry logic.
         
         Args:
             headlines: List of headlines to check for contradictions
+            query: Optional original user query for context
             
         Returns:
             Dict containing fact-check analysis
@@ -168,7 +169,7 @@ class ManagerAgent:
             logger.info(f"Calling fact-check service with {len(headlines)} headlines")
             response = self.client.post(
                 f"{self.factcheck_url}/run",
-                json={"headlines": headlines},
+                json={"headlines": headlines, "query": query},
                 timeout=self.timeout
             )
             response.raise_for_status()
@@ -270,7 +271,7 @@ class ManagerAgent:
             # Step 3: Fact-check for contradictions and controversial claims
             factcheck_results = None
             try:
-                factcheck_results = self._call_factcheck_service(headlines)
+                factcheck_results = self._call_factcheck_service(headlines, query=query)
             except Exception as e:
                 logger.warning(f"Fact-check service failed, continuing without it: {e}")
                 factcheck_results = {

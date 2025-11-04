@@ -5,7 +5,7 @@ Analyzes headlines for contradictions and controversial claims
 
 import json
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import google.generativeai as genai
 
 # Configure Gemini API
@@ -122,21 +122,27 @@ Create a detailed, professional fact-check report that clearly states VERIFIABIL
             }
         )
     
-    def analyze(self, headlines: List[str]) -> Dict[str, Any]:
+    def analyze(self, headlines: List[str], query: Optional[str] = None) -> Dict[str, Any]:
         """
         Analyze headlines for contradictions and controversial claims.
         
         Args:
             headlines: List of headline strings
+            query: Optional original user query for context
             
         Returns:
             Dictionary containing fact-check analysis with JSON summary and formatted markdown
         """
         try:
+            # Add query context if provided
+            query_context = f"User Query: '{query}'\n\n" if query else ""
+            
             # Create the prompt
-            prompt = f"""Analyze these headlines for factual accuracy and verifiability:
+            prompt = f"""{query_context}Analyze these headlines for factual accuracy and verifiability:
 
 {chr(10).join(f"{i+1}. {h}" for i, h in enumerate(headlines))}
+
+IMPORTANT: Focus on verifying the FACTS in the headlines themselves, NOT the specific phrasing of the user query. Whether the user asks "trump qatar jet" or "Did trump get a private jet from Qatar?", your analysis should be consistent because you're analyzing the same headlines.
 
 CRITICAL: Respond with ONLY valid JSON. NO text before or after.
 
